@@ -6,7 +6,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-    # Für Entwicklung nutze stattdessen volume und npm run dev:
+    # For development you can mount the source directory and run `npm run dev`:
     # volumes:
     #   - .:/usr/src/app
     #   - /usr/src/app/node_modules
