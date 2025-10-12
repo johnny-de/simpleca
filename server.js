@@ -18,6 +18,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve static files from the "data" directory
 app.use('/data', express.static(path.join(__dirname, 'data')));
 
+// liefert /public/certgen.html unter /certgen aus
+app.get('/certgen', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'certgen.html'));
+});
+
 // Helper functions
 
 // Check whether the CA private key and public certificate files exist on disk
@@ -99,14 +104,6 @@ app.post('/api/root-ca/upload', (req, res) => {
     return res.status(500).json({ error: 'Failed to save CA' });
   }
 });
-
-/*
-// Catch-all fallback to serve the single-page application's index.html.
-// This ensures that direct navigation to client routes returns the UI.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-*/
 
 // Start the HTTP server on configured port and log the access URL
 app.listen(PORT, () => {
