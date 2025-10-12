@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+/*document.addEventListener('DOMContentLoaded', () => {
   // Query and cache frequently used DOM elements for status, messages and forms
   const statusEl = document.getElementById('ca-status');
   const genMsgEl = document.getElementById('gen-message');
@@ -21,13 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fetch the current CA status from the server and update the UI text.
   function fetchStatus() {
-    fetch('/api/ca/status')
+    fetch('/api/root-ca/exsists')
       .then(r => r.json())
       .then(data => {
-        statusEl.textContent = data.exists ? 'Root-CA vorhanden' : 'Keine Root-CA vorhanden';
+        if (statusEl) statusEl.textContent = data.exists ? 'Root-CA vorhanden' : 'Keine Root-CA vorhanden';
       })
       .catch(() => {
-        statusEl.textContent = 'Fehler beim Laden des Status';
+        if (statusEl) statusEl.textContent = 'Fehler beim Laden des Status';
       });
   }
 
@@ -49,9 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setMessage(genMsgEl, 'Generiere...', false);
-    // Send POST request to /api/ca/generate with JSON payload and handle response
+    // Send POST request to /api/root-ca/generate with JSON payload and handle response
     try {
-      const resp = await fetch('/api/ca/generate' + (force ? '?force=1' : ''), {
+      const resp = await fetch('/api/root-ca/generate' + (force ? '?force=1' : ''), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commonName, days, keySize, algorithm: 'sha256' })
@@ -71,12 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
     doGenerate(false);
   });
 
-  // Handle explicit "force generate" button: confirm destructive action, then call generator with force
-  genForceBtn.addEventListener('click', () => {
-    if (!confirm('Bestehende CA überschreiben?')) return;
-    doGenerate(true);
-  });
-
   // Handle upload form submit: validate presence of both PEM fields and POST them to server
   uploadForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -87,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     setMessage(uploadMsgEl, 'Lade hoch...', false);
-    fetch('/api/ca/upload', {
+    fetch('/api/root-ca/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ private: privatePem, public: publicPem })
@@ -109,6 +103,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Initial warm-up call to the API and load the current status of the CA on page load
-  fetch('/api/hello').then(()=>{}).catch(()=>{});
   fetchStatus();
-});
+
+  // defensive: only attach listener if the optional force-button exists
+  if (genForceBtn) {
+    genForceBtn.addEventListener('click', () => {
+      if (!confirm('Bestehende CA überschreiben?')) return;
+      doGenerate(true);
+    });
+  }
+});*/

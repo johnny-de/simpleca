@@ -5,9 +5,9 @@ const selfsigned = require('selfsigned');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const CERT_DIR = path.join(__dirname, 'certs');
-const PRIVATE_FILE = path.join(CERT_DIR, 'root.key.pem');
-const PUBLIC_FILE = path.join(CERT_DIR, 'root.crt.pem');
+const CERT_DIR = path.join(__dirname, 'data');
+const PRIVATE_FILE = path.join(CERT_DIR, 'root-key.pem');
+const PUBLIC_FILE = path.join(CERT_DIR, 'root-crt.pem');
 
 // Body parsing for JSON requests (parse application/json and application/x-www-form-urlencoded)
 app.use(express.json());
@@ -15,6 +15,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static assets (HTML, CSS, JS) from the "public" directory
 app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from the "data" directory
+app.use('/data', express.static(path.join(__dirname, 'data')));
 
 // Helper functions
 
@@ -35,14 +37,14 @@ function ensureCertDir() {
 }
 
 // CA status: return whether a Root CA is present and a path to the private key (if present)
-app.get('/api/ca/status', (req, res) => {
+app.get('/api/root-ca/exsists', (req, res) => {
   res.json({ exists: caExists(), privatePath: caExists() ? '/certs/root.key.pem' : null });
 });
 
 // Generate a self-signed Root CA pair.
 // Accepts options via JSON body: commonName, days (validity), keySize, algorithm.
 // If "force" query flag is not set and CA exists, respond with 409 Conflict.
-app.post('/api/ca/generate', (req, res) => {
+app.post('/api/root-ca/generate', (req, res) => {
   const force = req.query.force === '1' || req.query.force === 'true';
   if (caExists() && !force) {
     return res.status(409).json({ error: 'CA already exists' });
@@ -78,13 +80,13 @@ app.post('/api/ca/generate', (req, res) => {
 
 // Upload existing PEM-formatted private key and certificate.
 // Performs simple format checks and writes the files with secure permissions.
-app.post('/api/ca/upload', (req, res) => {
+app.post('/api/root-ca/upload', (req, res) => {
   const { private: privatePem, public: publicPem } = req.body || {};
   if (!privatePem || !publicPem) {
     return res.status(400).json({ error: 'Both private and public PEM must be provided' });
   }
   // simple validation
-  if (!privatePem.includes('BEGIN') || !publicPem.includes('BEGIN')) {
+  if (!privatePem.includes('-----END RSA PRIVATE KEY-----') || !publicPem.includes('-----END CERTIFICATE-----')) {
     return res.status(400).json({ error: 'Invalid PEM format' });
   }
   try {
@@ -98,16 +100,13 @@ app.post('/api/ca/upload', (req, res) => {
   }
 });
 
-// Simple API endpoint used as a lightweight health-check / handshake from the frontend
-app.get('/api/hello', (req, res) => {
-  res.json({ message: 'Hallo von der API' });
-});
-
+/*
 // Catch-all fallback to serve the single-page application's index.html.
 // This ensures that direct navigation to client routes returns the UI.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+*/
 
 // Start the HTTP server on configured port and log the access URL
 app.listen(PORT, () => {
