@@ -1,115 +1,94 @@
-/*document.addEventListener('DOMContentLoaded', () => {
-  // Query and cache frequently used DOM elements for status, messages and forms
-  const statusEl = document.getElementById('ca-status');
-  const genMsgEl = document.getElementById('gen-message');
-  const uploadMsgEl = document.getElementById('upload-message');
-  const genForm = document.getElementById('generate-form');
-  const genBtn = document.getElementById('generate-btn');
-  const genForceBtn = document.getElementById('generate-force-btn');
-  const uploadForm = document.getElementById('upload-form');
-  const privatePemEl = document.getElementById('privatePem');
-  const publicPemEl = document.getElementById('publicPem');
-  const commonNameEl = document.getElementById('commonName');
-  const daysEl = document.getElementById('days');
-  const keySizeEl = document.getElementById('keySize');
+document.addEventListener('DOMContentLoaded', () => {
+  // Element references
+  const createRow = document.getElementById('generate-form')?.closest('.row');
+  const downloadAnchor = document.querySelector('a[href="/data/root-crt.pem"]');
+  const downloadRow = downloadAnchor ? downloadAnchor.closest('.row') : null;
 
-  // Helper to show messages to the user. Uses bootstrap text classes for basic styling.
-  function setMessage(el, text, isError = false) {
-    el.textContent = text;
-    el.className = isError ? 'text-danger' : 'text-success';
+  // Helper: set visible/invisible (reset display if visible=true and displayDefault is '')
+  function setVisible(el, visible, displayDefault = '') {
+    if (!el) return;
+    el.style.display = visible ? displayDefault : 'none';
   }
 
-  // Fetch the current CA status from the server and update the UI text.
-  function fetchStatus() {
-    fetch('/api/root-ca/exsists')
-      .then(r => r.json())
-      .then(data => {
-        if (statusEl) statusEl.textContent = data.exists ? 'Root-CA vorhanden' : 'Keine Root-CA vorhanden';
-      })
-      .catch(() => {
-        if (statusEl) statusEl.textContent = 'Fehler beim Laden des Status';
-      });
-  }
-
-  // Perform CA generation: collect form values, validate them, call the backend API.
-  // The "force" flag overrides existing CA files when set.
-  async function doGenerate(force = false) {
-    const commonName = commonNameEl.value.trim() || 'SimpleCA Root';
-    const days = parseInt(daysEl.value, 10) || 3650;
-    const keySize = parseInt(keySizeEl.value, 10) || 2048;
-
-    // Validate numeric inputs and allowed key sizes before sending request
-    if (days <= 0 || days > 36500) {
-      setMessage(genMsgEl, 'Gültigkeit (Tage) ungültig', true);
-      return;
-    }
-    if (![1024, 2048, 4096].includes(keySize)) {
-      setMessage(genMsgEl, 'Key-Größe ungültig', true);
-      return;
-    }
-
-    setMessage(genMsgEl, 'Generiere...', false);
-    // Send POST request to /api/root-ca/generate with JSON payload and handle response
+  // Checks /api/root-ca/exsists and adjusts UI accordingly
+  async function checkRootCA() {
     try {
-      const resp = await fetch('/api/root-ca/generate' + (force ? '?force=1' : ''), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commonName, days, keySize, algorithm: 'sha256' })
-      });
-      const j = await resp.json().catch(()=>({}));
-      if (!resp.ok) throw new Error(j.error || 'Fehler');
-      setMessage(genMsgEl, j.message || 'Root-CA erfolgreich generiert', false);
-      fetchStatus();
+      const res = await fetch('/api/root-ca/exsists', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Network response not ok');
+      const json = await res.json();
+      const exists = !!json.exists;
+
+      if (exists) {
+        // CA exists: hide form, show downloads
+        setVisible(createRow, false);
+        setVisible(downloadRow, true, '');
+      } else {
+        // CA missing: show form, hide downloads
+        setVisible(createRow, true, '');
+        setVisible(downloadRow, false);
+      }
     } catch (err) {
-      setMessage(genMsgEl, 'Fehler: ' + err.message, true);
+      // On error: just log, don't change UI
+      console.error('Failed to check root-CA status:', err);
     }
   }
 
-  // Handle generate form submit: prevent default form behavior and start generation
-  genForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    doGenerate(false);
-  });
+  // Initial check and repeat periodically
+  checkRootCA();
+  const INTERVAL_MS = 2000;
+  // periodically re-check CA presence
+  setInterval(checkRootCA, INTERVAL_MS);
 
-  // Handle upload form submit: validate presence of both PEM fields and POST them to server
-  uploadForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const privatePem = privatePemEl.value.trim();
-    const publicPem = publicPemEl.value.trim();
-    if (!privatePem || !publicPem) {
-      setMessage(uploadMsgEl, 'Beide PEM-Felder ausfüllen', true);
-      return;
-    }
-    setMessage(uploadMsgEl, 'Lade hoch...', false);
-    fetch('/api/root-ca/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ private: privatePem, public: publicPem })
-    })
-      .then(async r => {
-        if (!r.ok) {
-          const j = await r.json().catch(()=>({}));
-          throw new Error(j.error || 'Fehler');
+  // Helper: set message text and optional styling (type: 'success'|'error'|'')
+  function setMessage(el, text, type = '') {
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.remove('text-success', 'text-danger');
+    if (type === 'success') el.classList.add('text-success');
+    if (type === 'error') el.classList.add('text-danger');
+  }
+
+  // Handle generate form submit: call API to generate root CA
+  const generateForm = document.getElementById('generate-form');
+  const genMessage = document.getElementById('gen-message');
+  const generateBtn = document.getElementById('generate-btn');
+
+  if (generateForm) {
+    generateForm.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      // read form values
+      const commonName = document.getElementById('commonName')?.value || 'SimpleCA Root';
+      const days = document.getElementById('days')?.value || '3650';
+      const keySize = document.getElementById('keySize')?.value || '2048';
+
+      // disable button and show status
+      if (generateBtn) generateBtn.disabled = true;
+      setMessage(genMessage, 'Generating root CA...', '');
+
+      try {
+        const res = await fetch('/api/root-ca/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commonName, days, keySize })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // handle known server errors (e.g. 409 conflict)
+          const errMsg = data && data.error ? data.error : `Request failed (${res.status})`;
+          setMessage(genMessage, errMsg, 'error');
+        } else {
+          setMessage(genMessage, 'Root CA generated successfully.', 'success');
+          // update UI: hide generate form row and show download row
+          setVisible(createRow, false);
+          setVisible(downloadRow, true, 'block');
         }
-        return r.json();
-      })
-      .then(() => {
-        setMessage(uploadMsgEl, 'Root-CA erfolgreich hochgeladen');
-        privatePemEl.value = '';
-        publicPemEl.value = '';
-        fetchStatus();
-      })
-      .catch(err => setMessage(uploadMsgEl, 'Fehler: ' + err.message, true));
-  });
-
-  // Initial warm-up call to the API and load the current status of the CA on page load
-  fetchStatus();
-
-  // defensive: only attach listener if the optional force-button exists
-  if (genForceBtn) {
-    genForceBtn.addEventListener('click', () => {
-      if (!confirm('Bestehende CA überschreiben?')) return;
-      doGenerate(true);
+      } catch (err) {
+        console.error('Generate request failed:', err);
+        setMessage(genMessage, 'Network error while generating CA', 'error');
+      } finally {
+        if (generateBtn) generateBtn.disabled = false;
+      }
     });
   }
-});*/
+});
