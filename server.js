@@ -101,9 +101,9 @@ function formatExpiryDate(days) {
   return dt.toLocaleDateString('de-DE');
 }
 
-// CA status: return whether a Root CA is present and a path to the private key (if present)
+// CA status: return whether a Root CA is present
 app.get('/api/root-ca/exsists', (req, res) => {
-  res.json({ exists: caExists(), privatePath: caExists() ? '/certs/root.key.pem' : null });
+  res.json({ exists: caExists() });
 });
 
 // Generate a self-signed Root CA pair.
@@ -179,6 +179,14 @@ app.post('/api/leaf/generate', (req, res) => {
       return res.status(400).json({ error: 'Invalid keySize. Allowed: 1024, 2048, 4096' });
     }
 
+    // Prüfen auf vorhandenen Eintrag in certs.json ---
+    const certsObj = readCertsJson();
+    const normalizedNewName = String(commonName).trim().toLowerCase();
+    const exists = (certsObj.certificates || []).some(c => String(c.name || '').trim().toLowerCase() === normalizedNewName);
+    if (exists) {
+      return res.status(409).json({ error: 'Certificate with that name already exists' });
+    }
+
     // Build SANs array for selfsigned
     const sanList = String(sans || '').split(',').map(s => s.trim()).filter(Boolean);
     const altNames = sanList.map((entry) => {
@@ -221,7 +229,6 @@ app.post('/api/leaf/generate', (req, res) => {
     fs.writeFileSync(certPath, pems.cert, { mode: 0o644 });
 
     // update certs.json
-    const certsObj = readCertsJson();
     const expiry = formatExpiryDate(daysNum);
     certsObj.certificates = certsObj.certificates || [];
     certsObj.certificates.push({

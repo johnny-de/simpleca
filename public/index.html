@@ -19,7 +19,8 @@
     </div>
   </nav>
 
-  <main class="container py-5">
+  <!-- main initially hidden; will be shown by JS nach erfolgreichem API-Check -->
+  <main id="app-content" class="container py-5" style="display:none">
     <!-- Card wrapper containing two panels:
          - Left: form to generate a new Root CA
          - Right: form to upload an existing private key + certificate
@@ -110,7 +111,7 @@
       <!-- Inserted: list of leaf certificates -->
       <div class="card-body">
         <div class="table-responsive">
-          <table class="table table-striped align-middle">
+          <table class="table table-hover align-middle">
             <tbody id="leaf-list">
               <!-- will be filed with entries from certs.json -->
             </tbody>

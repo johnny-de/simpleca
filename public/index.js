@@ -1,8 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   // Element references
   const createRow = document.getElementById('generate-form')?.closest('.row');
+  const leafCertRow = document.getElementById('create-leaf-btn')?.closest('.row');
   const downloadAnchor = document.querySelector('a[href="/data/root-crt.pem"]');
   const downloadRow = downloadAnchor ? downloadAnchor.closest('.row') : null;
+
+  // reference to the whole app content that is hidden by default
+  const appContent = document.getElementById('app-content');
 
   // Helper: set visible/invisible (reset display if visible=true and displayDefault is '')
   function setVisible(el, visible, displayDefault = '') {
@@ -13,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Checks /api/root-ca/exsists and adjusts UI accordingly
   async function checkRootCA() {
     try {
-      const res = await fetch('/api/root-ca/exsists', { cache: 'no-store' });
+      const res = await fetch('/api/root-ca/exsists');
       if (!res.ok) throw new Error('Network response not ok');
       const json = await res.json();
       const exists = !!json.exists;
@@ -22,10 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // CA exists: hide form, show downloads
         setVisible(createRow, false);
         setVisible(downloadRow, true, '');
+        setVisible(leafCertRow, true, '');
       } else {
         // CA missing: show form, hide downloads
         setVisible(createRow, true, '');
         setVisible(downloadRow, false);
+        setVisible(leafCertRow, false);
       }
     } catch (err) {
       // On error: just log, don't change UI
@@ -33,11 +39,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Initial check and repeat periodically
-  checkRootCA();
+  // Initial check: warte auf das Ergebnis und zeige dann den zuvor versteckten Hauptbereich.
   const INTERVAL_MS = 2000;
-  // periodically re-check CA presence
-  setInterval(checkRootCA, INTERVAL_MS);
+  (async function init() {
+    try {
+      await checkRootCA();
+    } catch (e) {
+      // intentional: proceed to show UI even if checkRootCA threw (errors are logged inside)
+    } finally {
+      if (appContent) {
+        // restore display (leer lässt das CSS/GH-Layout entscheiden) — falls Probleme, 'block' setzen
+        appContent.style.display = '';
+      }
+      // danach das periodische Polling starten
+      setInterval(checkRootCA, INTERVAL_MS);
+    }
+  })();
 
   // Helper: set message text and optional styling (type: 'success'|'error'|'')
   function setMessage(el, text, type = '') {
