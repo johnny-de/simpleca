@@ -91,4 +91,99 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // --- Helper function to load leaf-certs ---
+  function escapeHtml(str) {
+    if (!str && str !== 0) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderLeafList(certs) {
+    const tbody = document.getElementById('leaf-list');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!certs || certs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-muted">No leaf certificates</td></tr>';
+      return;
+    }
+    certs.forEach((entry) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(entry.name)}</td>
+        <td>${escapeHtml(entry.expiry)}</td>
+        <td>
+          <a href="/data/${encodeURIComponent(entry.cert_file)}" class="btn btn-sm btn-primary m-1" download>Download Certificate</a>
+          <a href="/data/${encodeURIComponent(entry.key_file)}" class="btn btn-sm btn-secondary m-1" download>Download Key</a>
+          <!-- pass only the certificate name to the delete handler -->
+          <button class="btn btn-sm btn-danger" data-name="${escapeHtml(entry.name)}" title="Delete">
+            <img src="/delete.svg" alt="Delete" width="16" height="16" />
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // NEW: delegate click events on delete buttons (sends { name } to /api/leaf/delete)
+  (function attachDeleteHandler() {
+    const tbody = document.getElementById('leaf-list');
+    if (!tbody) return;
+    tbody.addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-name]');
+      if (!btn) return;
+      const name = btn.getAttribute('data-name');
+      if (!name) return;
+      if (!confirm(`Delete certificate "${name}"?`)) return;
+
+      btn.disabled = true;
+      // show a short status in the existing gen-message area (if available)
+      setMessage(genMessage, `Deleting ${name}...`, '');
+
+      try {
+        const res = await fetch('/api/leaf/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const err = data && data.error ? data.error : `Delete failed (${res.status})`;
+          setMessage(genMessage, err, 'error');
+        } else {
+          setMessage(genMessage, `Deleted ${name}`, 'success');
+          // reload list to reflect deletion
+          await loadLeafList();
+        }
+      } catch (err) {
+        console.error('Delete request failed', err);
+        setMessage(genMessage, 'Network error while deleting certificate', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  })();
+
+  async function loadLeafList() {
+    try {
+      // Load the static certs.json from /data (no cache to reflect updates immediately)
+      const res = await fetch('/data/certs.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to fetch certs.json (${res.status})`);
+      const json = await res.json();
+      // certs.json has a top-level "certificates" array
+      renderLeafList(json && Array.isArray(json.certificates) ? json.certificates : []);
+    } catch (err) {
+      console.error('Failed to load certs.json from /data:', err);
+      // Keep previous UI state; show placeholder row if needed
+      renderLeafList([]);
+    }
+  };
+
+  // initial and periodic load
+  loadLeafList();
+  const LEAF_REFRESH_MS = 5000;
+  setInterval(loadLeafList, LEAF_REFRESH_MS);
 });
