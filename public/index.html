@@ -48,7 +48,7 @@
                   </div>
                   <div class="mb-3">
                     <label for="days" class="form-label">Lifetime (days)</label>
-                    <input id="days" type="number" class="form-control" value="3650" min="1" required/>
+                    <input id="days" type="number" class="form-control" value="36500" min="1" required/>
                   </div>
                   <div class="mb-3">
                     <label for="keySize" class="form-label">Key-Size (bits)</label>
@@ -94,8 +94,9 @@
         <!-- Row with download-buttons for root-crt and root-key -->
         <div class="row mt-3">
           <div class="col-12 d-flex gap-2">
-            <a href="/data/root-crt.pem" class="btn btn-primary" download>Download Certificate (PUBLIC)</a>
-            <a href="/data/root-key.pem" class="btn btn-secondary" download>Download Key (SECRET)</a>
+            <a href="/data/root-crt.pem" class="btn btn-primary" download>Download Certificate (.pem)</a>
+            <a href="/data/root-crt.der" class="btn btn-primary" download>Download Certificate (.der)</a>
+            <a href="/data/root-key.pem" class="btn btn-secondary" download>Download Private Key (.pem)</a>
           </div>
         </div>
       </div>

@@ -1,6 +1,9 @@
 # Use a lightweight Node 18 image based on Alpine for a small final image
 FROM node:18-alpine
 
+# Install OpenSSL (and bash if you need scripts)
+RUN apk add --no-cache openssl bash
+
 WORKDIR /usr/src/app
 
 # Copy dependency manifests first so Docker can cache 'npm ci' layer when only source files change.
