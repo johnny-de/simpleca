@@ -15,7 +15,7 @@ const CERTS_JSON = path.join(CERT_DIR, 'certs.json');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// liefert /public/certgen.html unter /certgen aus
+// delivers /public/certgen.html under /certgen
 app.get('/certgen', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'certgen.html'));
 });
@@ -106,7 +106,8 @@ function convertPemToDer(pemFilePath, derFilePath) {
 }
 
 // CA status: return whether a Root CA is present
-app.get('/api/root-ca/exsists', (req, res) => {
+// NOTE: endpoint name corrected from "exsists" to "exists"
+app.get('/api/root-ca/exists', (req, res) => {
   res.json({ exists: caExists() });
 });
 
@@ -270,7 +271,7 @@ app.post('/api/leaf/generate', (req, res) => {
       return res.status(400).json({ error: 'Root CA not present. Generate/upload root CA first.' });
     }
 
-    // Prüfen auf vorhandenen Eintrag in certs.json ---
+    // Check for existing cert in certs.json ---
     const certsObj = readCertsJson();
     const normalizedNewName = String(commonName).trim().toLowerCase();
     const exists = (certsObj.certificates || []).some(c => String(c.name || '').trim().toLowerCase() === normalizedNewName);
@@ -419,9 +420,9 @@ ${altNamesSection}
   }
 });
 
-// delete helper: sucht Eintrag in certs.json, löscht die beiden Dateien (cert_file, key_file)
-// und entfernt den Eintrag nur wenn keine I/O-Fehler beim Löschen aufgetreten sind.
-// Rückgabe: { status: 'ok'|'notfound'|'error', details: { deleted:[], missing:[], errors:[] }, entry? }
+// delete helper: searches certs.json entry by name, deletes files (cert_file, key_file, optional chain_file)
+// and removes entry only if no I/O errors occurred.
+// Returns: { status: 'ok'|'notfound'|'error', details: { deleted:[], missing:[], errors:[] }, entry? }
 function deleteCertificateByName(name) {
   if (!name) return { status: 'notfound' };
   const certsObj = readCertsJson();
@@ -429,12 +430,12 @@ function deleteCertificateByName(name) {
 
   const idx = certsObj.certificates.findIndex(c => c.name === String(name));
   if (idx === -1) {
-    console.log(`[delete] Eintrag mit name="${name}" nicht gefunden in certs.json`);
+    console.log(`[delete] Entry with name="${name}" not found in certs.json`);
     return { status: 'notfound' };
   }
 
   const entry = certsObj.certificates[idx];
-  console.log('[delete] Gefundener Eintrag:', entry);
+  console.log('[delete] Found entry:', entry);
 
   const dirResolved = path.resolve(CERT_DIR) + path.sep;
   const resolveFilename = (filename) => {
@@ -465,7 +466,7 @@ function deleteCertificateByName(name) {
         fs.unlinkSync(check.resolved);
         deleted.push(check.filename);
       } else {
-        // Datei fehlt bereits -> als "missing" vermerken, aber kein fataler Fehler
+        // file already missing -> note as "missing", but not a fatal error
         missing.push(check.filename);
       }
     } catch (e) {
@@ -475,18 +476,18 @@ function deleteCertificateByName(name) {
 
   attemptUnlink(certCheck);
   attemptUnlink(keyCheck);
-  attemptUnlink(chainCheck); // neu: versucht auch das fullchain-file zu löschen
+  attemptUnlink(chainCheck); // also attempts to delete the fullchain file if present
 
   if (errors.length > 0) {
-    // Bei echten Fehlern: nichts an certs.json ändern
+    // On real errors, do not modify certs.json
     return { status: 'error', details: { deleted, missing, errors }, entry };
   }
 
-  // Wenn kein schwerer Fehler aufgetreten ist, Eintrag entfernen und persistieren
+  // If no severe error occurred, remove entry and persist changes
   certsObj.certificates.splice(idx, 1);
   try {
     writeCertsJson(certsObj);
-    console.log(`[delete] certs.json aktualisiert, Eintrag "${name}" entfernt`);
+    console.log(`[delete] certs.json updated, entry "${name}" removed`);
   } catch (e) {
     console.error('[delete] Failed to write certs.json after deletion', e);
     return { status: 'error', details: { deleted, missing, writeError: String(e) }, entry };
@@ -495,7 +496,29 @@ function deleteCertificateByName(name) {
   return { status: 'ok', details: { deleted, missing }, entry };
 }
 
-// ersetze POST-Route durch Aufruf des Helpers und ausführliches Logging
+// Compatibility: provide POST endpoint to delete by JSON body { name }
+// This keeps frontend (which sends POST) working while GET handler (query param) remains available.
+app.post('/api/leaf/delete', (req, res) => {
+  try {
+    const name = req.body && req.body.name;
+    console.log('[api] POST /api/leaf/delete body.name=', name);
+    if (!name) return res.status(400).json({ error: 'Missing "name" in request body' });
+
+    const result = deleteCertificateByName(name);
+    if (result.status === 'notfound') {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+    if (result.status === 'error') {
+      return res.status(500).json({ error: 'Failed to delete certificate', details: result.details });
+    }
+    return res.json({ message: 'Certificate deleted', name, details: result.details });
+  } catch (err) {
+    console.error('POST delete failed', err);
+    return res.status(500).json({ error: 'Failed to delete certificate', details: String(err && err.message ? err.message : err) });
+  }
+});
+
+// keep older GET-based delete endpoint for backward compatibility
 app.get('/api/leaf/delete', (req, res) => {
   try {
     const name = req.query.name;
@@ -512,7 +535,7 @@ app.get('/api/leaf/delete', (req, res) => {
     return res.json({ message: 'Certificate deleted', name, details: result.details });
   } catch (err) {
     console.error('GET delete failed', err);
-    return res.status(500).json({ error: 'Failed to delete certificate', details: String(err) });
+    return res.status(500).json({ error: 'Failed to delete certificate', details: String(err && err.message ? err.message : err) });
   }
 });
 
@@ -521,5 +544,5 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 
 app.listen(PORT, () => {
-  console.log(`App läuft auf http://localhost:${PORT}`);
+  console.log(`App is running at http://localhost:${PORT}`);
 });

@@ -12,14 +12,14 @@
   <!-- Top navigation bar -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container">
-      <a class="navbar-brand d-flex align-items-center" href="\">
+      <a class="navbar-brand d-flex align-items-center" href="/">
         <img src="/icon.svg" alt="SimpleCA logo" width="35" height="35" class="me-2" />
         <span>SimpleCA</span>
       </a>
     </div>
   </nav>
 
-  <!-- main initially hidden; will be shown by JS nach erfolgreichem API-Check -->
+  <!-- main initially hidden; will be shown by JS after root-CA check -->
   <main id="app-content" class="container py-5" style="display:none">
     <!-- Card wrapper containing two panels:
          - Left: form to generate a new Root CA
@@ -72,7 +72,7 @@
           <div class="col-md-6 mb-4">
             <div class="card ca-panel">
               <div class="card-body">
-                <h5 class="card-title">Uplaod Root Certificate</h5>
+                <h5 class="card-title">Upload Root Certificate</h5>
                 <form id="upload-form">
                   <div class="mb-3">
                     <label for="privatePem" class="form-label">Private Key (PEM)</label>
@@ -114,7 +114,7 @@
         <div class="table-responsive">
           <table class="table table-hover align-middle">
             <tbody id="leaf-list">
-              <!-- will be filed with entries from certs.json -->
+              <!-- will be filled with entries from certs.json -->
             </tbody>
           </table>
         </div>
@@ -122,7 +122,7 @@
         <!-- Button for generating new leaf certificates -->
         <div class="row mt-3">
           <div class="col-12">
-            <a id="create-leaf-btn" class="btn btn-success" href="\certgen" rel="noopener">
+            <a id="create-leaf-btn" class="btn btn-success" href="/certgen" rel="noopener">
               Generate new Certificate
             </a>
           </div>

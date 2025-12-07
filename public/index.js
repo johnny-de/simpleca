@@ -14,10 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     el.style.display = visible ? displayDefault : 'none';
   }
 
-  // Checks /api/root-ca/exsists and adjusts UI accordingly
+  // Checks /api/root-ca/exists and adjusts UI accordingly
   async function checkRootCA() {
     try {
-      const res = await fetch('/api/root-ca/exsists');
+      const res = await fetch('/api/root-ca/exists');
       if (!res.ok) throw new Error('Network response not ok');
       const json = await res.json();
       const exists = !!json.exists;
@@ -91,14 +91,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          // handle known server errors (e.g. 409 conflict)
           const errMsg = data && data.error ? data.error : `Request failed (${res.status})`;
           setMessage(genMessage, errMsg, 'error');
         } else {
           setMessage(genMessage, 'Root CA generated successfully.', 'success');
           // update UI: hide generate form row and show download row
           setVisible(createRow, false);
-          setVisible(downloadRow, true, 'block');
+          setVisible(downloadRow, true, '');
         }
       } catch (err) {
         console.error('Generate request failed:', err);
@@ -129,14 +128,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     certs.forEach((entry) => {
+      const chainFile = entry.chain_file ? `/data/${encodeURIComponent(entry.chain_file)}` : null;
+      const certFile = entry.cert_file ? `/data/${encodeURIComponent(entry.cert_file)}` : null;
+      const keyFile = entry.key_file ? `/data/${encodeURIComponent(entry.key_file)}` : null;
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(entry.name)}</td>
         <td>${escapeHtml(entry.expiry)}</td>
         <td>
-          <a href="/data/${encodeURIComponent(entry.chain_file)}" class="btn btn-sm btn-primary m-1" download>Download Certificate</a>
-          <a href="/data/${encodeURIComponent(entry.key_file)}" class="btn btn-sm btn-secondary m-1" download>Download Key</a>
-          <!-- pass only the certificate name to the delete handler -->
+          ${chainFile ? `<a href="${chainFile}" class="btn btn-sm btn-primary m-1" download>Download Certificate</a>` : ''}
+          ${keyFile ? `<a href="${keyFile}" class="btn btn-sm btn-secondary m-1" download>Download Key</a>` : ''}
           <button class="btn btn-sm btn-danger" data-name="${escapeHtml(entry.name)}" title="Delete">
             <img src="/delete.svg" alt="Delete" width="16" height="16" />
           </button>
@@ -157,10 +159,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!confirm(`Delete certificate "${name}"?`)) return;
 
       btn.disabled = true;
-      // show a short status in the existing gen-message area (if available)
       setMessage(genMessage, `Deleting ${name}...`, '');
 
       try {
+        // send POST with JSON body (server accepts POST)
         const res = await fetch('/api/leaf/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -172,7 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
           setMessage(genMessage, err, 'error');
         } else {
           setMessage(genMessage, `Deleted ${name}`, 'success');
-          // reload list to reflect deletion
           await loadLeafList();
         }
       } catch (err) {

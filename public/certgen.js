@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const err = data && data.error ? data.error : `Server error (${res.status})`;
         setMessage(err, true);
       } else {
-        // Bei Erfolg sofort zur Hauptseite zurückkehren
+        // On success redirect back to main page
         window.location.href = '/';
       }
     } catch (err) {
