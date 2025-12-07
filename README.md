@@ -9,10 +9,7 @@ It allows you to easily generate your own Root Certificate or upload an existing
 
 <div align="center">
     <a href="https://github.com/johnny-de/simpleca/">
-        <img src="https://github.com/johnny-de/data/blob/main/simpleca/app.png?raw=true" 
-             alt="Screenshot" 
-             width="600" 
-             style="border: 2px solid black;"/>
+        <img src="https://github.com/johnny-de/data/blob/main/simpleca/app.png?raw=true" alt="Screenshot" width="600"/>
     </a>
 </div>
 
