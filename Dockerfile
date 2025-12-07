@@ -1,17 +1,15 @@
-# Steps:
-# 1. Start Docker Desktop
-# 2. Open Visual Studio terminal
-# 3. Run the command to build and push image with a version-specific tag (e.g. '1.9.0'):
+# Steps (Ubuntu):
+# 1. Run the command to build and push image with a version-specific tag (e.g. '1.9.0'):
 #    ! Dont forget to adapt the tag !    
-#    > docker buildx build --platform linux/amd64,linux/arm64 -t johnnyde/alarmwatcher:1.9.0 --push . 
-# 4. Run the command to build and push image with the 'latest' tag:
-#    > docker buildx build --platform linux/amd64,linux/arm64 -t johnnyde/alarmwatcher:latest --push . 
+#    > sudo docker buildx build --platform linux/amd64,linux/arm64 -t johnnyde/simpleca1.0.0 --push . 
+# 2. Run the command to build and push image with the 'latest' tag:
+#    > sudo docker buildx build --platform linux/amd64,linux/arm64 -t johnnyde/simpleca:latest --push . 
 
 # Use an official Node.js runtime as a parent image
-FROM node:20
+FROM node:20-slim
 
 # Install OpenSSL (and bash if you need scripts)
-RUN apk add --no-cache openssl bash
+RUN apt-get update && apt-get install -y openssl bash && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 
