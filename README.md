@@ -1,5 +1,5 @@
 **SimpleCA** is a lightweight, self-hosted Certificate Authority (CA) web application.  
-It allows you to easily generate your own Root Certificat or upload a existing one, and then issue Leaf Certificates based on them. These certificates can be used to secure websites and services in a lab or private network environment.
+It allows you to easily generate your own Root Certificate or upload an existing one, and then issue Leaf Certificates based on them. These certificates can be used to secure websites and services in a lab or private network environment.
 
 <a target="_blank" href="https://github.com/johnny-de/simpleca"><img src="https://img.shields.io/github/stars/johnny-de/simpleca?style=flat" /></a> 
 <a target="_blank" href="https://github.com/johnny-de/simpleca"><img src="https://img.shields.io/github/v/release/johnny-de/simpleca" /></a> 
@@ -20,6 +20,7 @@ It allows you to easily generate your own Root Certificat or upload a existing o
 - **Web-based frontend:** Intuitive interface for managing certificates.
 - **Simple workflow:** Designed for labs and test environments for quick setup.
 - **Exportable keys and certs:** Download PEM files for direct use in servers and clients.
+- **Dockerized deployment:** Run SimpleCA easily in any environment using Docker.
 
 ## How it works
 
@@ -35,12 +36,23 @@ It allows you to easily generate your own Root Certificat or upload a existing o
    - On your web server, configure the Leaf Certificate and private key.  
    - Since clients already trust the Root CA, connections to your site will be recognized as secure.
 
-## Example usage
+## Docker usage
 
-- Import the Root Certificate into your browser or operating system.  
-- Configure your web server (e.g., Nginx, Apache, or Dockerized service) with the Leaf Certificate and its key.  
-- Access your site via HTTPS — the browser will trust it because the Root CA is known.
+SimpleCA is available as a Docker image on [Docker Hub](https://hub.docker.com/r/johnnyde/simpleca).
 
-## Bug reports / feature requests
+Run it with:
 
+```bash
+docker run -d \
+  -p 3000:3000 \
+  --name simpleca \
+  johnnyde/simpleca
+```
+
+## Example usage 
+- Import the Root Certificate into your browser or operating system. 
+- Configure your web server (e.g., Nginx, Apache, or Dockerized service) with the Leaf Certificate and its key. 
+- Access your site via HTTPS — the browser will trust it because the Root CA is known. 
+
+## Bug reports / feature requests 
 If you want to report a bug or request a new feature, feel free to open a [new issue](https://github.com/johnny-de/simpleca/issues).
