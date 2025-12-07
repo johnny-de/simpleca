@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const selfsigned = require('selfsigned');
 const { execFileSync } = require('child_process');
 
 const app = express();
@@ -114,8 +113,8 @@ app.get('/api/root-ca/exsists', (req, res) => {
 // Import a regular expression to check for IP addresses
 const isIpAddress = (value) => /^(\d{1,3}\.){3}\d{1,3}$/.test(value);
 
-// Generate a self-signed Root CA pair.
-// Accepts options via JSON body: commonName, days (validity), keySize, algorithm.
+// Generate a self-signed Root CA pair using openssl instead of the selfsigned library.
+// Accepts options via JSON body: commonName, days (validity), keySize.
 // If "force" query flag is not set and CA exists, respond with 409 Conflict.
 app.post('/api/root-ca/generate', (req, res) => {
   const force = req.query.force === '1' || req.query.force === 'true';
@@ -123,67 +122,110 @@ app.post('/api/root-ca/generate', (req, res) => {
     return res.status(409).json({ error: 'CA already exists' });
   }
 
-  const { commonName = 'SimpleCA Root', days = 3650, keySize = 2048, algorithm = 'sha256' } = req.body || {};
-  //console.log('New certificate requested: ', req.body);
-
-  // Validation of input parameters: ensure numeric ranges and allowed key sizes
+  const { commonName = 'SimpleCA Root', days = 3650, keySize = 2048 } = req.body || {};
   const daysNum = parseInt(days, 10);
   const keySizeNum = parseInt(keySize, 10);
 
-  // Initialize altNames array with CN as the first SAN entry
-  const altNames = [];
-
-  // Check if the commonName is an IP address or a DNS name
-  if (isIpAddress(commonName)) {
-      altNames.push({ type: 7, ip: commonName });  // IP type for IP address CN
-  } else {
-      altNames.push({ type: 2, value: commonName }); // DNS type for domain CN
+  if (!Number.isFinite(daysNum) || daysNum <= 0 || daysNum > 36500) {
+    return res.status(400).json({ error: 'Invalid days value' });
   }
-  
-  // Define attributes for the certificate
-  const attrs = [
-      { name: 'commonName', value: commonName }
-  ];
+  if (![1024, 2048, 4096].includes(keySizeNum)) {
+    return res.status(400).json({ error: 'Invalid keySize. Allowed: 1024, 2048, 4096' });
+  }
 
-  // Define the options for the certificate generation
-  const options = {
-      keySize: keySizeNum,
-      days: daysNum,
-      algorithm: 'sha256',
-      extensions: [
-          {
-              name: 'basicConstraints',
-              cA: true
-          },
-          {
-              name: 'keyUsage',
-              keyCertSign: true,
-              cRLSign: true
-          },
-          // ensure the CN is also present as SAN for the root cert
-          {
-              name: 'subjectAltName',
-              altNames: altNames
-          }
-      ]
-  };
+  // Build SAN entries: include CN as first SAN
+  const sanEntries = [];
+  if (commonName) {
+    if (isIpAddress(commonName)) sanEntries.push({ type: 'IP', value: commonName });
+    else sanEntries.push({ type: 'DNS', value: commonName });
+  }
 
+  // prepare files
   try {
-    // Generate self-signed certificate with updated options
-    const pems = selfsigned.generate(attrs, options);
-
     ensureCertDir();
-    // write root key/cert with secure permissions
-    fs.writeFileSync(PRIVATE_FILE, pems.private, { mode: 0o600 });
-    fs.writeFileSync(PUBLIC_FILE, pems.cert, { mode: 0o644 });
 
-    // Convert the PEM certificate to DER format
-    convertPemToDer(PUBLIC_FILE, DER_FILE);
+    // create temporary openssl config for root CA with SANs and CA extensions
+    let altNamesSection = '';
+    let dnsCount = 0;
+    let ipCount = 0;
+    for (const entry of sanEntries) {
+      if (entry.type === 'DNS') {
+        dnsCount += 1;
+        altNamesSection += `DNS.${dnsCount} = ${entry.value}\n`;
+      } else {
+        ipCount += 1;
+        altNamesSection += `IP.${ipCount} = ${entry.value}\n`;
+      }
+    }
+
+    const cfgFile = path.join(CERT_DIR, `root-openssl.cnf`);
+    const cfg = `
+[ req ]
+default_bits = ${keySizeNum}
+distinguished_name = req_distinguished_name
+x509_extensions = v3_ca
+prompt = no
+default_md = sha256
+
+[ req_distinguished_name ]
+CN = ${commonName}
+
+[ v3_ca ]
+basicConstraints = critical, CA:true, pathlen:0
+keyUsage = critical, cRLSign, keyCertSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+subjectAltName = @alt_names
+
+[ alt_names ]
+${altNamesSection}
+`.trim();
+
+    fs.writeFileSync(cfgFile, cfg, { mode: 0o600 });
+
+    // generate private key and self-signed root cert using openssl
+    try {
+      // generate private key
+      execFileSync('openssl', ['genrsa', '-out', PRIVATE_FILE, String(keySizeNum)], { cwd: CERT_DIR });
+
+      // generate self-signed cert (x509) with extensions from config
+      execFileSync('openssl', [
+        'req', '-new', '-x509',
+        '-key', PRIVATE_FILE,
+        '-out', PUBLIC_FILE,
+        '-days', String(daysNum),
+        '-sha256',
+        '-subj', `/CN=${commonName}`,
+        '-config', cfgFile,
+        '-extensions', 'v3_ca'
+      ], { cwd: CERT_DIR });
+    } catch (e) {
+      // cleanup on error
+      try { if (fs.existsSync(PRIVATE_FILE)) fs.unlinkSync(PRIVATE_FILE); } catch (_) {}
+      try { if (fs.existsSync(PUBLIC_FILE)) fs.unlinkSync(PUBLIC_FILE); } catch (_) {}
+      try { if (fs.existsSync(cfgFile)) fs.unlinkSync(cfgFile); } catch (_) {}
+      console.error('OpenSSL root CA generation failed', e && e.message ? e.message : e);
+      return res.status(500).json({ error: 'Failed to generate Root CA (openssl error)', details: String(e && e.message ? e.message : e) });
+    } finally {
+      // remove config file
+      try { if (fs.existsSync(cfgFile)) fs.unlinkSync(cfgFile); } catch (_) {}
+    }
+
+    // set file permissions
+    try { fs.chmodSync(PRIVATE_FILE, 0o600); } catch (_) {}
+    try { fs.chmodSync(PUBLIC_FILE, 0o644); } catch (_) {}
+
+    // Convert to DER
+    try {
+      convertPemToDer(PUBLIC_FILE, DER_FILE);
+    } catch (e) {
+      console.error('Failed to convert PEM to DER', e);
+    }
 
     return res.json({ message: 'Root CA generated', commonName: commonName, days: daysNum, keySize: keySizeNum });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Failed to generate CA' });
+    console.error('Root CA generation failed', err);
+    return res.status(500).json({ error: 'Failed to generate CA', details: String(err && err.message ? err.message : err) });
   }
 });
 

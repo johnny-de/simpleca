@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${escapeHtml(entry.name)}</td>
         <td>${escapeHtml(entry.expiry)}</td>
         <td>
-          <a href="/data/${encodeURIComponent(entry.chain_file)}" class="btn btn-sm btn-primary m-1" download>Download Certificate Chain</a>
+          <a href="/data/${encodeURIComponent(entry.chain_file)}" class="btn btn-sm btn-primary m-1" download>Download Certificate</a>
           <a href="/data/${encodeURIComponent(entry.key_file)}" class="btn btn-sm btn-secondary m-1" download>Download Key</a>
           <!-- pass only the certificate name to the delete handler -->
           <button class="btn btn-sm btn-danger" data-name="${escapeHtml(entry.name)}" title="Delete">
