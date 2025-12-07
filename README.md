@@ -1,4 +1,4 @@
-**SimpleCA** is a lightweight, self-hosted Certificate Authority (CA) web application.  
+**SimpleCA** is a lightweight, self-hosted docker-based Certificate Authority (CA) web application.  
 It allows you to easily generate your own Root Certificate or upload an existing one, and then issue Leaf Certificates based on them. These certificates can be used to secure websites and services in a lab or private network environment.
 
 <a target="_blank" href="https://github.com/johnny-de/simpleca"><img src="https://img.shields.io/github/stars/johnny-de/simpleca?style=flat" /></a> 
